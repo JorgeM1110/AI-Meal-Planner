@@ -1,5 +1,6 @@
 # server/image_nutrition.py
 import os, re, tempfile, traceback
+import json
 from typing import Dict, Any
 from fastapi import APIRouter, UploadFile, File, HTTPException
 from fastapi.responses import JSONResponse
@@ -45,6 +46,56 @@ def pick_nutrients(nlist):
                 "unit": getattr(n, "unit_name", None),
             })
     return out
+
+'''
+Makes prompt for coach reccomendation given usda info from image uploaded by user
+Should reccommend a healthier option using the image as an ingredient
+'''
+def pick_reccomendation(food, usda, nutrients):
+    usdaData = {
+        "fdc_id": getattr(usda, "fdc_id", None),
+        "description": getattr(usda, "description", None),
+        "brand_owner": getattr(usda, "brand_owner", None),
+        "brand_name": getattr(usda, "brand_name", None),
+        "category": getattr(usda, "food_category", None),
+        "class": getattr(usda, "food_class", None),
+        "serving_size": getattr(usda, "serving_size", None),
+        "serving_unit": getattr(usda, "serving_size_unit", None),
+        "ingredients": getattr(usda, "ingredients", None),
+        "nutrients": nutrients,
+    }
+
+    return ("Imagine you are a registered dietitian and practical meal coach.\n"
+        "Your task for this is to propose one healthier meal that uses the detected food as an ingredient.\n"
+        "Goals:\n"
+        "• Improve nutrient density (protein, fiber, micronutrients) and reduce added sugar, sodium, and saturated fat versus the detected item when relevant.\n"
+        "• Keep it realistic for a home cook; max ~10 ingredients; 20–40 min total time for weeknight suitability.\n"
+        "• Use widely available ingredients; include simple swaps for common dietary needs.\n\n"
+         "Constraints:\n"
+        "• Return STRICT JSON only. No commentary.\n"
+        "• JSON schema:\n"
+        "{\n"
+        '  "title": str,\n'
+        '  "why_better": str,\n'
+        '  "servings": int,\n'
+        '  "macros_per_serving": {\n'
+        '    "kcal": int,\n'
+        '    "protein_g": number,\n'
+        '    "carbs_g": number,\n'
+        '    "fat_g": number,\n'
+        '    "fiber_g": number,\n'
+        '    "sodium_mg": number,\n'
+        '    "sugar_g": number\n'
+        "  },\n"
+        '  "ingredients": [str, ...],\n'
+        '  "steps": [str, ...],\n'
+        '  "prep_time_min": int,\n'
+        '  "cook_time_min": int,\n'
+        '  "dietary_swaps": [str, ...]\n'
+        "}\n\n"
+        f"Detected food (from image): {food}\n"
+        f"USDA selection (trimmed): {json.dumps(usdaData, ensure_ascii=False)}\n"
+        "Return the JSON now.")
 
 @router.post("/image-nutrition")
 async def image_nutrition(file: UploadFile = File(...)) -> Dict[str, Any]:
@@ -110,7 +161,8 @@ async def image_nutrition(file: UploadFile = File(...)) -> Dict[str, Any]:
 
         # --- 5) Fetch USDA food and return trimmed nutrients list ---
         food = fdc.get_food(indexes[idx])
-        return {
+        nutrients = pick_nutrients(getattr(food, "nutrients", []))
+        base = {
             "detected_label": food_query,
             "fdc_id": food.fdc_id,
             "description": food.description,
@@ -121,8 +173,34 @@ async def image_nutrition(file: UploadFile = File(...)) -> Dict[str, Any]:
             "serving_size": getattr(food, "serving_size", None),
             "serving_unit": getattr(food, "serving_size_unit", None),
             "ingredients": getattr(food, "ingredients", None),
-            "nutrients": pick_nutrients(getattr(food, "nutrients", [])),
+            "nutrients": nutrients,
         }
+
+        # 6: Coach reccomendation from prompt to gemini
+        coach = pick_reccomendation(food_query, food, nutrients)
+        query_response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=[uploaded, coach],
+            config=types.GenerateContentConfig(
+                temperature=0.4,
+                top_p=0.9,
+                top_k=40,
+                response_mime_type="application/json",
+            )
+        )
+        coach_text = query_response.text
+
+        # This block helps to format JSON and remove any SDK response from call
+        s = (coach_text or "").strip()
+        if s.startswith("```"):
+            s = s.strip("`")
+
+            s = "\n".join([ln for ln in s.splitlines() if ln.strip().lower() != "json"])
+        coach_text = json.loads(s)
+
+        # Return base with new recommendation
+        base["Coach Recommendation"] = coach_text
+        return base
 
     except HTTPException:
         raise
