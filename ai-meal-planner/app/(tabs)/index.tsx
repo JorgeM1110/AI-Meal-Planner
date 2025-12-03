@@ -5,8 +5,8 @@ export default function HomeScreen() {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>AI Meal Planner</Text>
-      <Text style={styles.sub}>Tap the button to generate a mock plan.</Text>
-      <Button title="Plan My Week" onPress={() => router.push("/plan")} />
+      <Text style={styles.sub}>Tap the button to generate nutrient information and to develop a meal plan</Text>
+      <Button title="Image Nutrition Analysis and Meal Coach" onPress={() => router.push("/coach")} />
     </View>
   );
 }
