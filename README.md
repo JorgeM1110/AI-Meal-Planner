@@ -18,16 +18,22 @@ prototype evaluation.
 # 2. Problem Definition
 
 **2.1. Public Health Context**
+
 Being overweight or obese is a major cause of many long-term illnesses, such as
 diabetes and heart disease. An important factor in this problem is that people have a
 hard time eating a balanced diet. The root causes include:
+
 ● Lack of Nutritional Knowledge: People often have trouble reading food labels and
 figuring out what macronutrients are in raw ingredients.
+
 ● Lack of Clarity: Branded foods often hide their nutritional value, which makes it
 hard to make healthy choices.
+
 ● Time Limits: Busy modern lives don't leave much time for planning meals and
 keeping track of calories.
+
 **2.2. Limitations of Existing Solutions**
+
 Digital diet tracking has been tried by market players like MyFitnessPal, Lifesum, and
 FitGenie. However, these solutions present significant friction points:
 
@@ -44,17 +50,24 @@ stop using them.
 
 Our pilot changes the way people plan their meals by switching from using paper forms
 to using AI to automate the process.
+
 **3.1. Core Features**
+
 ● Image-to-Nutrition Analysis: A person posts a picture of a food item or ingredient.
 The software looks at the visual data, compares it to the USDA FoodData Central
 (FDC) database, and then gives accurate nutritional data like calories, protein,
 fats, and more. This eliminates the need for manual text search.
+
 ● The AI Coach: This app does more than just track; it also works as a "Coach." As
 the "main ingredient," the posted picture is what the AI uses to make a full,
 healthy recipe. The Coach provides:
+
 ○ Step-by-step cooking instructions.
+
 ○ Prep and cook times.
+
 ○ A breakdown of macros per serving.
+
 ○ An explanation of the health benefits of this dish over the raw item.
 
 # 4. System Architecture & Technical Implementation
@@ -62,7 +75,9 @@ healthy recipe. The Coach provides:
 The app is made as a full-stack system, with a React Native frontend that works on all
 mobile platforms and a FastAPI (Python) server that handles high-performance
 asynchronous processing.
+
 **4.1. The AI & Data Pipeline**
+
 The main reasoning is in server/image_nutrition.py, and it works in six steps:
 
 1. Image Ingestion: The React Native app uses a POST call to /image-nutrition to
@@ -83,7 +98,9 @@ The main reasoning is in server/image_nutrition.py, and it works in six steps:
 6. Coach Recommendation: Lastly, Gemini receives a complicated prompt telling it
     to use the discovered item as a "registered dietitian" and create a healthy food
     plan.
+
 **4.2. Code Implementation Details**
+
 The backend uses a bespoke FdcClient for USDA data and the google.genai library for
 LLM interaction.
 Environmental Security: To prevent credentials from being hardcoded into the repository,
@@ -106,6 +123,7 @@ the Large Language Model (LLM).
 # 5. Algorithmic Methodology
 
 **5.1. Nutrient Filtering Algorithm**
+
 The USDA API's raw data frequently contains hundreds of micronutrients. We
 developed the pick_nutrients filtering method to enhance user readability.
 Logic: The function verifies against a hash map of "Primary Nutrients" (PRI_NUTRS)
@@ -114,46 +132,65 @@ populates up to 12 items, this guarantees the user sees the most pertinent data
 (Calories, Protein, Fat, and Carbs) without being overpowered by trace minerals.
 
 **5.2. Context-Aware Prompt Engineering**
+
 "Persona-based" prompting was the method we used. By giving the LLM the following
 instructions: "Imagine you are a registered dietitian and practical meal coach," we train
 the model to put practicality and health first. Additionally, we added limitations to the
 prompt:
+
 ● Max ~10 ingredients: Prevents overly complex recipes.
+
 ● 20-40 min total time: Ensures weeknight suitability.
+
 ● Dietary Swaps: Ensures the app remains useful for users with restrictions.
 
 # 6. Model Evaluation (Quantitative & Qualitative)
 
 **6.1. Quantitative Performance Metrics**
+
 We evaluated the system based on response time and data accuracy.
+
 ● Latency Analysis:
+
 ○ Image Upload & Processing: ~1.5 seconds.
+
 ○ Gemini Identification (Vision): ~2.0 seconds.
+
 ○ USDA Search & Verification: ~1.0 seconds.
+
 ○ Coach Recipe Generation: ~3.5 seconds.
+
 ○ Total End-to-End Latency: Approximately 8.0 seconds.
+
 ○ Evaluation: It is much quicker than a human manually searching a
 database, cross-referencing nutrition, and locating a recipe (which usually
 takes 5–10 minutes), even though 8 seconds is longer than a static
 database search.
+
 ● Accuracy of Recognition: 20 different food products (fruits, veggies, packaged
 snacks) were tested.
+
 ○ Gemini Visual Identification: 95% Accuracy (only failed on obscure,
 unbranded packages).
+
 ○ USDA Matching: 90% Accuracy (sometimes mismatched "Raw" and
 "Cooked").
+
 ○ JSON Structure Validity: 100% Formatting errors were avoided by the
 schema requirements.
 
 
 **6.2. Qualitative User Feedback**
+
 ● Convenience: Compared to scrolling through dropdown options in rivals like
 MyFitnessPal, users found the "snap and cook" workflow to be far more
 interesting.
+
 ● "Coach" Personality: The addition of the "Why is this better?" section was highly
 praised. It educated users on why a recipe was healthy, rather than just giving
 numbers. Instead of just providing numbers, it informed customers about the
 health benefits of a dish.
+
 ● Flexibility: The "what should I cook?" The conundrum was resolved by the
 system's ability to recognize ingredients in a user's refrigerator and recommend
 suitable meals.
@@ -165,14 +202,19 @@ in 2024 to **$10.37 billion. With a unique value proposition, our solution is po
 take a piece of this market.
 
 **7.1. Business Model**
+
 ● Freemium Strategy: The basic meal planner and manual tracking are free to
 attract a user base.
+
 ● Premium membership: A membership is required to access the "AI Coach,"
 automatic shopping lists, and sophisticated macro-tracking.
+
 ● B2B Partnerships: The design enables connection with supermarket delivery
 APIs, such as DoorDash and Instacart. Users may add items to a cart with a
 single click when the AI offers a recipe, earning affiliate income.
+
 **7.2. Competitive Advantage**
+
 Our usage of LLMs enables indefinite scalability, in contrast to applications that depend
 on static databases. The AI creates recipes on demand depending on user preferences,
 so we don't need to manually add them to our database. As a result, content
@@ -194,21 +236,26 @@ maintenance expenses are almost completely eliminated.
 
 ● "Model could not identify food": Make sure the food item is centered and the
 image is well-lit. The Gemini API may reject an image if it is fuzzy.
+
 ● "No USDA matches": The product may be too specialized. Instead of
 photographing the food itself, try taking a picture of the product's name or
 barcode.
+
 ● API Limits: The Google Gemini API quota may have been exceeded if the
 application hangs. After 60 seconds, give it another go.
 
 # 9. Ethical Considerations & Data Privacy
 
 We follow stringent ethical standards as an AI-powered health application.
+
 ● Data privacy: User facial data is not stored by the application. To protect privacy,
 images are processed temporarily in temporary files
 (tempfile.NamedTemporaryFile) and promptly erased after analysis.
+
 ● Health Disclaimer: The AI is a "Coach," not a physician. Although LLMs
 sometimes have hallucinations, we rely on publicly available USDA statistics.
 Users should be aware that nutritional information is only an estimate.
+
 ● Transparency: To make sure users are aware of the source of the advice, we
 clearly mark recommendations as AI-generated.
 
